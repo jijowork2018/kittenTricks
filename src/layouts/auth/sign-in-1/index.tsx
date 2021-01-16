@@ -1,14 +1,46 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useReducer, useEffect, useState, useCallback } from 'react';
+import { StyleSheet, View, Dimensions } from 'react-native';
 import { Button, Input, Text } from '@ui-kitten/components';
 import { ImageOverlay } from './extra/image-overlay.component';
 import { ArrowForwardIcon, FacebookIcon, GoogleIcon, TwitterIcon } from './extra/icons';
 import { KeyboardAvoidingView } from './extra/3rd-party';
+import { useDispatch } from 'react-redux';
+const { height, width } = Dimensions.get('window');
+import * as authActions from '../../../services/store/actions/auth';
 
-export default ({ navigation }): React.ReactElement => {
+
+const FORM_INPUT_UPDATE = 'FORM_INPUT_UPDATE';
+
+const formReducer = (state, action) => {
+  if (action.type === FORM_INPUT_UPDATE) {
+    const updatedValues = {
+      ...state.inputValues,
+      [action.input]: action.value
+    };
+    const updatedValidities = {
+      ...state.inputValidities,
+      [action.input]: action.isValid
+    };
+    let updatedFormIsValid = true;
+    for (const key in updatedValidities) {
+      updatedFormIsValid = updatedFormIsValid && updatedValidities[key];
+    }
+    return {
+      formIsValid: updatedFormIsValid,
+      inputValidities: updatedValidities,
+      inputValues: updatedValues
+    };
+  }
+  return state;
+};
+export default ({ props,navigation }): React.ReactElement => {
 
   const [email, setEmail] = React.useState<string>();
   const [password, setPassword] = React.useState<string>();
+  const [error, setError] = useState();
+  const [isLoading, setIsLoading] = useState(false);
+
+
 
   const onSignInButtonPress = (): void => {
     navigation && navigation.goBack();
@@ -17,6 +49,58 @@ export default ({ navigation }): React.ReactElement => {
   const onSignUpButtonPress = (): void => {
     navigation && navigation.navigate('SignUp1');
   };
+
+  const dispatch = useDispatch();
+
+  const [formState, dispatchFormState] = useReducer(formReducer, {
+    inputValues: {
+      username: '',
+      password: ''
+    },
+    inputValidities: {
+      username: false,
+      password: false
+    },
+    formIsValid: false
+  });
+
+  useEffect(() => {
+    if (error) {
+      console.log("error")
+      //Alert.alert('An Error Occurred!', error, [{ text: 'Okay' }]);
+    }
+  }, [error]);
+
+  const authHandler = async () => {
+    let action;
+    console.log("in action=======")
+      action = authActions.login(
+        formState.inputValues.username,
+        formState.inputValues.password
+      );
+    setError(null);
+    setIsLoading(true);
+    try {
+      await dispatch(action);
+      props.navigation.navigate('Shop');
+    } catch (err) {
+      setError(err.message);
+      setIsLoading(false);
+    }
+  };
+
+  const inputChangeHandler = useCallback(
+    (inputIdentifier, inputValue, inputValidity) => {
+      console.log("in change handler======",inputValue)
+      dispatchFormState({
+        type: FORM_INPUT_UPDATE,
+        value: inputValue,
+        isValid: inputValidity,
+        input: inputIdentifier
+      });
+    },
+    [dispatchFormState]
+  );
 
   return (
     <KeyboardAvoidingView>
